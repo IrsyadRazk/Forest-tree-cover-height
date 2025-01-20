@@ -1,0 +1,52 @@
+First, you need to upload the geojson/shp file to the google earth repository and code it as aoi (area of interest)
+
+var canopy_height = ee.Image('users/nlang/ETH_GlobalCanopyHeight_2020_10m_v1');
+var standard_deviation = ee.Image('users/nlang/ETH_GlobalCanopyHeightSD_2020_10m_v1');
+
+// Define ROI
+var aoi;
+Map.centerObject(aoi,10);
+
+//print ROI
+Map.addLayer (aoi, {},'aoi', false)
+
+
+
+// Clip the canopy height data to the AOI
+var canopy_height_clipped = canopy_height.clip(aoi);
+
+// Mask canopy heights above 5 meters
+var canopy_above_5m = canopy_height_clipped.updateMask(canopy_height_clipped.gte(5));
+
+// Define visualization parameters for canopy height above 5 meters
+var visParamsAbove5 = {
+  min: 5,     // Start visualization at 5 meters
+  max: 30,    // Maximum canopy height to display
+  palette: ['grey','green', 'yellow', 'orange', 'red']
+};
+
+// Add the masked canopy height layer to the map
+Map.addLayer(canopy_above_5m, visParamsAbove5, 'Canopy Height Above 5m');
+
+// Add the AOI boundary for visualization
+Map.addLayer(aoi, {color: 'white'}, 'AOI Boundary');
+
+// Calculate pixel area in square meters
+var pixelArea = ee.Image.pixelArea();
+
+// Calculate the area for pixels with canopy height above 5 meters
+var canopy_area = pixelArea.updateMask(canopy_above_5m);
+
+// Sum the total area in square meters within the AOI
+var area_stats = canopy_area.reduceRegion({
+  reducer: ee.Reducer.sum(),
+  geometry: aoi,
+  scale: 10,    // Use the scale of the canopy height data (10 meters)
+  maxPixels: 1e9
+});
+
+// Get the area in square meters and convert to hectares
+var area_hectares = ee.Number(area_stats.get('area')).divide(10000);
+
+// Print the result
+print('Area of canopy height above 5 meters (hectares):', area_hectares);
